@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+import calendar
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly
+sns.set_style('darkgrid')
+from pandas_datareader import data #Package for pulling data from the web
+from datetime import date
+from fbprophet import Prophet
+
+class StockForecastModel:
+    def __init__(self, tickers, start_date):
+        self.tickers = tickers
+        self.start_date = start_date
+        self.end_date = date.today()
+        self.etf_df = None
+        self.corr_mat = None
+        #self.columns = None
+        #self.predicator_forecast = None
+        #self.etf_prophet = None
+        self.m = Prophet()
+        #self.forecast = None
+        
+    def pull_data(self,source):
+        self.etf_df= data.DataReader(self.tickers, 
+                                     start=self.start_date, 
+                                     end = self.end_date,
+                                     data_source=source)['Adj Close']
+        self.etf_df = self.etf_df.dropna()
+        self.etf_df.head(5)
+
+
+        
+    def create_corr_matrix(self, i, stock, title_suffix):
+        self.corr_mat = self.etf_df.corr()
+        columns = self.corr_mat.nlargest(i,stock)[stock].index
+        corrmat = np.corrcoef(self.etf_df[columns].values.T)
+        heatmap = sns.heatmap(corrmat,
+                    cbar=True,
+                    annot=True, 
+                    xticklabels = columns.values,
+                    yticklabels = columns.values)
+        ax.set_title('Correlation Matrix for '+str(title_suffix))
+        plt.show()
+
+       
+
+    def create_predictor_forecast(self,ticker,f,p):
+        self.prophet= pd.DataFrame()
+        self.prophet['ds'] = self.etf_df.index
+        self.prophet['y'] = self.etf_df[ticker].values
+        self.m=Prophet()
+        self.m=fit(self.prophet)
+        future_pred_length = self.m.make_future_dataframe(freq=f, periods = p)
+        self.forecast=self.m.predict(future_pred_length)
+        self.pred= pd.DataFrame(self.forecast['trend'].values)
+
+
+    def create_predicator_forecast(self):
+        #Creating dfs to model with
+        self.iyw_prophet = pd.DataFrame()
+        self.iyw_prophet['ds'] = self.etf_df.index
+        self.iyw_prophet['y'] = self.etf_df['IYW'].values
+
+        self.n225_prophet = pd.DataFrame()
+        self.n225_prophet['ds'] = self.etf_df.index
+        self.n225_prophet['y'] = self.etf_df['^N225'].values
+
+        self.exsa_prophet = pd.DataFrame()
+        self.exsa_prophet['ds'] = self.etf_df.index
+        self.exsa_prophet['y'] = self.etf_df['EXSA.MI'].values
+
+        #Fitting models
+        self.iyw_m = Prophet()
+        self.iyw_m.fit(self.iyw_prophet)
+
+        self.n225_m = Prophet()
+        self.n225_m.fit(self.n225_prophet)
+
+        self.exsa_m = Prophet()
+        self.exsa_m.fit(self.exsa_prophet)
+
+        #Defining length of forecast
+        future_pred_length = self.iyw_m.make_future_dataframe(freq='m',periods = 18)
+
+        #Forecasting
+        self.iyw_forecast = self.iyw_m.predict(future_pred_length)
+        self.iyw_pred = pd.DataFrame(self.iyw_forecast['trend'].values)
+
+        self.n225_forecast = self.n225_m.predict(future_pred_length)
+        self.n225_pred = pd.DataFrame(self.n225_forecast['trend'].values)
+
+        self.exsa_forecast = self.exsa_m.predict(future_pred_length)
+        self.exsa_pred = pd.DataFrame(self.exsa_forecast['trend'].values)
+
+        #Combining predicators into one df
+        frames = [future_pred_length,self.iyw_pred,self.n225_pred,self.exsa_pred]
+        self.predicator_forecast
